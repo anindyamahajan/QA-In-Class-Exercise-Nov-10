@@ -16,13 +16,9 @@ const fillingArb = fc.constantFrom('potato', 'sauerkraut', 'sweet-cheese', 'mush
 const kindArb = fc.constantFrom('hot', 'frozen');
 const tierArb = fc.constantFrom('guest', 'regular', 'vip');
 const zoneArb = fc.constantFrom('local', 'outer');
+const couponCodeArb = fc.constantFrom('PIEROGI-BOGO', 'FIRST10', null);
 
-// This composite arbitrary generator builds an order item object using the primitive building blocks defined above
-// Each field in the object below specifies the arbitrary generator to use for that field
-//
-// To learn more about composite arbitraries: https://fast-check.dev/docs/core-blocks/arbitraries/composites
 const orderItemArb = fc.record({
-  // e.g., this will use the kindArb to generate a value for the 'kind' field
   kind: kindArb,
   sku: skuArb,
   title: fc.string(),
@@ -32,14 +28,8 @@ const orderItemArb = fc.record({
   addOns: fc.array(addOnArb, { maxLength: 3 })
 });
 
-// We use the orderItemArb defined above to build an order object that contains an array of order items
-const orderArb = fc.record({
-  // we specify the maximum and minimum length of the items array here
-  items: fc.array(orderItemArb, { minLength: 1, maxLength: 5 })
-});
-
-const profileArb = fc.record({ tier: fc.constantFrom([12, 24]) });
-
+const orderArb = fc.record({ items: fc.array(orderItemArb, { minLength: 1, maxLength: 5 }) });
+const profileArb = fc.record({ tier: tierArb });
 
 // ------------------------------------------------------------------------------
 // To test discounts, tax, delivery and total, you will need to add more
@@ -56,42 +46,32 @@ const profileArb = fc.record({ tier: fc.constantFrom([12, 24]) });
 
 describe('Property-Based Tests for Orders', () => {
   describe('Invariants', () => {
-    
-    // Here's an example preservation property!
     it('subtotal should always be non-negative integer', () => {
       fc.assert(
         fc.property(orderArb, (order) => {
           const result = subtotal(order);
           return result >= 0 && Number.isInteger(result);
-        }),
-        { numRuns: 50 }
+        })
       );
     });
 
-    // ---------------------------------------------------------------------------
-    // Add more invariant properties for discounts, tax, delivery, and total here
-    // You can adapt the starter code below.
-    // Feel free to copy, paste, and modify as needed multiple times.
-    // ---------------------------------------------------------------------------
-    //
-    // it('subtotal should always be non-negative integer', () => {
-    //   fc.assert(
-    //     fc.property(, (order) => { // add the appropriate arbitraries here
-    //       const result = subtotal(order); // change this to the function you are testing
-    //       return result >= 0 && Number.isInteger(result); // add the property you want to verify
-    //     }),
-    //     { numRuns: 50 } // you can adjust the number of runs as needed
-    //   );
-    // });
-
-    it('should never return a negative discount', () => {
+    it('applied discount should always be non-negative integer', () => {
       fc.assert(
-        fc.property(orderArb, profileArb, (order, profile) => {
-          const result = discounts(order, profile);
-          return result >= 0;
-        }),
-        { numRuns: 50 }
+        fc.property(orderArb, profileArb, couponCodeArb, (order, profile, coupon) => {
+          const result = discounts(order, profile, coupon);
+          return result >= 0 && Number.isInteger(result);
+        })
       )
+    });
+
+    it('empty order should always result in subtotal of zero', () => {
+      fc.assert(
+        fc.property(profileArb, couponCodeArb, (profile, coupon) => {
+          const result = discounts({items: []}, profile, coupon);
+          console.log(profile, coupon)
+          return result == 0 && Number.isInteger(result);
+        })
+      );
     });
   });
 });
