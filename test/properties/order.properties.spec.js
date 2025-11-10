@@ -38,6 +38,8 @@ const orderArb = fc.record({
   items: fc.array(orderItemArb, { minLength: 1, maxLength: 5 })
 });
 
+const profileArb = fc.record({ tier: fc.constantFrom([12, 24]) });
+
 
 // ------------------------------------------------------------------------------
 // To test discounts, tax, delivery and total, you will need to add more
@@ -82,5 +84,14 @@ describe('Property-Based Tests for Orders', () => {
     //   );
     // });
 
+    it('should never return a negative discount', () => {
+      fc.assert(
+        fc.property(orderArb, profileArb, (order, profile) => {
+          const result = discounts(order, profile);
+          return result >= 0;
+        }),
+        { numRuns: 50 }
+      )
+    });
   });
 });
